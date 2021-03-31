@@ -1,0 +1,14 @@
+had to remove 12 games (72 entries) due to corrupted data (not having exactly 6 entries)
+checked to make sure all files had the correct number of labels
+set up DNN model using tensorflow keras
+data normalized by taking zscore of values, yielding mean 0 and stdev 1
+labels converted to integer values
+first test with 5 hidden layers, 2000 epochs, 50000 batch size= 21% accuracy
+ -> 5x Dense(30, activation="relu")
+Initial gridsearch for 5x5 grid of batchsize 200-50000 and epochs 100-500 yield
+ - batch size 200 and 100 epochs = 11.2%
+ - done with 3 fold crossvalidation using GridSearchCV
+
+Second gridsearch 5x5 of bs 200-50000 and epochs 500-2000
+
+regression problem - exploding gradient (val_loss = nan)
