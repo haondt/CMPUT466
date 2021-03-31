@@ -22,6 +22,7 @@ from kerastuner.engine.tuner import Tuner
 
 from Data import Data, DataPrep
 
+first_layer_size=65
 class cv_tuner(Tuner):
     class_weight = None
     def run_trial(self, trial, x,y, batch_size, epochs):
@@ -50,7 +51,7 @@ class cv_tuner(Tuner):
 
 def create_classification_model():
     model = Sequential()
-    model.add(Dense(44, input_shape=(65,), activation='tanh'))
+    model.add(Dense(44, input_shape=(first_layer_size,), activation='tanh'))
     model.add(Dense(
         units=40,
         activation='tanh'
@@ -116,7 +117,7 @@ def classification_model_builder(hp):
 
     '''
     model = Sequential()
-    model.add(Dense(hp.Int('units_first_layer',40,80,step=10), input_shape=(65,),
+    model.add(Dense(hp.Int('units_first_layer',40,80,step=10), input_shape=(first_layer_size,),
         activation=hp.Choice('activation_first_layer', values=['relu','sigmoid','tanh'])))
 
     for i in range(hp.Int('additional_layers', 2, 8)):
@@ -146,7 +147,7 @@ def classification_model_builder_refined(hp):
     create_classification_model
     '''
     model = Sequential()
-    model.add(Dense(hp.Int('units_first_layer',35,45,step=1), input_shape=(65,),
+    model.add(Dense(hp.Int('units_first_layer',35,45,step=1), input_shape=(first_layer_size,),
         activation='tanh'))
 
     for i in range(hp.Int('additional_layers', 1, 3)):
@@ -250,7 +251,7 @@ def test_classification_model(test):
     print('acc:', acc)
     print('loss:', loss)
 
-def plot_classification_model(test, model=None, plot_type='violin_per_rank'):
+def plot_classification_model(test, model=None, plot_type='alpha'):
     if model is None:
         with open('model.json', 'r') as f:
             model_json = f.read()
@@ -356,6 +357,19 @@ def plot_classification_model(test, model=None, plot_type='violin_per_rank'):
         plt.xlim(lims)
         plt.ylim(lims)
         plt.show()
+    elif plot_type == 'std_dev_per_rank':
+        # Show distribution of predictions with a box plot for each rank
+        preds = {i:[] for i in range(19)}
+        for i in range(len(test_y_hat)):
+            preds[test.class_labels_numeric[i]].append(test_y_hat[i])
+        preds = [preds[i] for i in range(19)]
+        std = [np.std(i) for i in preds]
+        plt.bar(list(range(19)),std)
+
+        plt.xlabel('Rank')
+        plt.ylabel('Standard Deviation')
+        plt.show()
+
 
 
 
@@ -392,7 +406,7 @@ def main():
     #test_classification_model(test)
 
     # Test model and plot result
-    plot_classification_model(test)
+    #plot_classification_model(test)
 
 
 
