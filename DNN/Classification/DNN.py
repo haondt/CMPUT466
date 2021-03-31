@@ -22,7 +22,11 @@ from kerastuner.engine.tuner import Tuner
 
 from Data import Data, DataPrep
 
+from lime import lime_tabular
+
+
 first_layer_size=65
+
 class cv_tuner(Tuner):
     class_weight = None
     def run_trial(self, trial, x,y, batch_size, epochs):
@@ -51,13 +55,18 @@ class cv_tuner(Tuner):
 
 def create_classification_model():
     model = Sequential()
-    model.add(Dense(44, input_shape=(first_layer_size,), activation='tanh'))
+    model.add(Dense(39, input_shape=(first_layer_size,), activation='tanh'))
     model.add(Dense(
-        units=40,
-        activation='tanh'
+        units=28,
+        activation='relu'
     ))
-    model.add(Dropout(0.12202))
-    model.add(Dense(67, activation="softmax"))
+    model.add(Dropout(0.098954))
+    model.add(Dense(
+        units=32,
+        activation='sigmoid'
+    ))
+    model.add(Dropout(0.027818))
+    model.add(Dense(19, activation="softmax"))
 
     model.compile(
         optimizer=Adam(
@@ -143,7 +152,7 @@ def classification_model_builder(hp):
 def classification_model_builder_refined(hp):
     '''
     Results:
-    Acheived 0.20581613779067992 val_accuracy, settings copied into
+    Acheived 0.20034334063529968 val_accuracy, settings copied into
     create_classification_model
     '''
     model = Sequential()
@@ -157,7 +166,7 @@ def classification_model_builder_refined(hp):
         ))
         model.add(Dropout(hp.Float('dropout_' + str(i), min_value=0.01, max_value=0.25, default=0.1)))
 
-    model.add(Dense(hp.Int('final_layer_units', 65,80,step=1), activation="softmax"))
+    model.add(Dense(19, activation="softmax"))
 
     model.compile(
         optimizer=Adam(
@@ -186,7 +195,6 @@ def tune_classification(data):
     best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
     print(best_hps.values)
 
-
 def train_classification_model(train):
 
     model = create_classification_model()
@@ -194,7 +202,7 @@ def train_classification_model(train):
         x=train.feature_numeric,
         y=train.class_labels_numeric,
         batch_size=100000,
-        epochs=200,
+        epochs=500,
         verbose=1,
         class_weight=train.class_weight,
         validation_split=0.2
@@ -223,8 +231,7 @@ def train_classification_model(train):
     plt.legend(['train', 'validation'], loc='upper left')
     plt.show()
 
-def test_classification_model(test):
-
+def get_model():
     with open('model.json', 'r') as f:
         model_json = f.read()
 
@@ -239,6 +246,12 @@ def test_classification_model(test):
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )
+    return model
+
+def test_classification_model(test, model=None):
+
+    if model is None:
+        model = get_model()
 
     scores = model.evaluate(
         x=test.feature_numeric,
@@ -253,20 +266,7 @@ def test_classification_model(test):
 
 def plot_classification_model(test, model=None, plot_type='alpha'):
     if model is None:
-        with open('model.json', 'r') as f:
-            model_json = f.read()
-
-        model = model_from_json(model_json)
-        model.load_weights('model.h5')
-        model.compile(
-            optimizer=Adam(
-                learning_rate=0.0025923,
-                beta_1=0.90489,
-                beta_2=0.99883
-            ),
-            loss='sparse_categorical_crossentropy',
-            metrics=['accuracy']
-        )
+        model = get_model()
 
     test_y_hat = model.predict_classes(test.feature_numeric)
 
@@ -371,6 +371,32 @@ def plot_classification_model(test, model=None, plot_type='alpha'):
         plt.show()
 
 
+def explain_model(test: Data, train: Data, model=None):
+    if model is None:
+        model = get_model()
+
+
+    sample = np.array([test.feature_numeric[25]])
+    print(model.predict_classes(sample))
+
+    explainer = lime_tabular.LimeTabularExplainer(
+        train.feature_numeric,
+        feature_names=train.feature_names,
+        class_names=train.class_labels_numeric,
+        discretize_continuous=True
+    )
+    exp = explainer.explain_instance(
+        test.feature_numeric[25],
+        model.predict_proba,
+        num_features=first_layer_size,
+        top_labels=19
+    )
+
+    print(test.class_labels_numeric[25])
+
+
+
+    exp.save_to_file('lime.html',show_table=True, show_all=False)
 
 
 
@@ -406,7 +432,10 @@ def main():
     #test_classification_model(test)
 
     # Test model and plot result
-    #plot_classification_model(test)
+    #for p in ['heat', 'avg_per_rank','box_per_rank','violin_per_rank','std_dev_per_rank']:
+        #plot_classification_model(test, plot_type=p)
+
+    explain_model(test,train)
 
 
 

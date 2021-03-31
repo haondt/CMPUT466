@@ -4,5 +4,7 @@ __pycache__/
 DNN/**/*.json
 DNN/**/*.h5
 DNN/**/*.png
+DNN/**/*.html
+DNN/**/figures/
 *.csv
 *.data
