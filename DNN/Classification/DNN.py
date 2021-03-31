@@ -250,47 +250,114 @@ def test_classification_model(test):
     print('acc:', acc)
     print('loss:', loss)
 
-def plot_classification_model(test):
-    with open('model.json', 'r') as f:
-        model_json = f.read()
+def plot_classification_model(test, model=None, plot_type='violin_per_rank'):
+    if model is None:
+        with open('model.json', 'r') as f:
+            model_json = f.read()
 
-    model = model_from_json(model_json)
-    model.load_weights('model.h5')
-    model.compile(
-        optimizer=Adam(
-            learning_rate=0.0025923,
-            beta_1=0.90489,
-            beta_2=0.99883
-        ),
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
-    )
+        model = model_from_json(model_json)
+        model.load_weights('model.h5')
+        model.compile(
+            optimizer=Adam(
+                learning_rate=0.0025923,
+                beta_1=0.90489,
+                beta_2=0.99883
+            ),
+            loss='sparse_categorical_crossentropy',
+            metrics=['accuracy']
+        )
 
     test_y_hat = model.predict_classes(test.feature_numeric)
 
-    '''
-    scores = model.evaluate(
-        x=test.feature_numeric,
-        y=test.class_labels_numeric,
-        verbose=0,
-    )
-    '''
+    if plot_type == 'alpha' or plot_type == 'heat':
+        # plot predictions vs true
+        a = plt.axes(aspect='equal')
+        lims = [-1,19]
+        _ = plt.plot(lims, lims)
+
+        if plot_type == 'alpha':
+            # Plot using transparency
+            plt.scatter(test.class_labels_numeric, test_y_hat, alpha=0.05)
+        else:
+            # Plot using colors
+            points = []
+            counts = {}
+            for i in range(len(test_y_hat)):
+                x = test.class_labels_numeric[i]
+                y = test_y_hat[i]
+                xy = (x,y)
+                points.append(xy)
+                if xy not in counts:
+                    counts[xy] = 0
+                counts[xy] += 1
+            x = [i[0] for i in points]
+            y = [i[1] for i in points]
+            z = [counts[i]/len(test_y_hat)*100 for i in points]
+
+            plt.scatter(x,y, c=z, cmap=plt.cm.jet, norm=LogNorm())
+
+            cbar = plt.colorbar()
+            cbar.set_label('Percentage of total labels [%]', rotation=270, labelpad=15)
+
+        plt.xlabel('True Values [rank]')
+        plt.ylabel('Predictions [rank]')
+        plt.xlim(lims)
+        plt.ylim(lims)
+        plt.show()
+
+    elif plot_type == 'avg_per_rank':
+        # Plot average prediction of each rank
+        a = plt.axes(aspect='equal')
+        preds = {i:[] for i in range(19)}
+        for i in range(len(test_y_hat)):
+            preds[test.class_labels_numeric[i]].append(test_y_hat[i])
+        preds = [np.mean(preds[i]) for i in range(19)]
+        plt.plot(list(range(19)), preds)
+        plt.legend(['Average Prediction'])
+
+        lims = [-1,19]
+        _ = plt.plot(lims, lims)
+        plt.xlabel('True Values [rank]')
+        plt.ylabel('Prediction [rank]')
+        plt.xlim(lims)
+        plt.ylim(lims)
+        plt.show()
+
+    elif plot_type == 'box_per_rank':
+        # Show distribution of predictions with a box plot for each rank
+        a = plt.axes(aspect='equal')
+        preds = {i:[] for i in range(19)}
+        for i in range(len(test_y_hat)):
+            preds[test.class_labels_numeric[i]].append(test_y_hat[i])
+        preds = [preds[i] for i in range(19)]
+        plt.boxplot(preds, positions=list(range(19)))
+
+        lims = [-1,19]
+        _ = plt.plot(lims, lims)
+        plt.xlabel('True Values [rank]')
+        plt.ylabel('Prediction [rank]')
+        plt.xlim(lims)
+        plt.ylim(lims)
+        plt.show()
+
+    elif plot_type == 'violin_per_rank':
+        # Show distribution of predictions with a violin plot for each rank
+        plt.figure(figsize=(20,6), dpi=80)
+        preds = {i:[] for i in range(19)}
+        for i in range(len(test_y_hat)):
+            preds[test.class_labels_numeric[i]].append(test_y_hat[i])
+        preds = [preds[i] for i in range(19)]
+        plt.violinplot(preds, positions=list(range(19)), showmeans=True)
+
+        lims = [-1,19]
+        _ = plt.plot(lims, lims)
+        plt.xlabel('True Values [rank]')
+        plt.ylabel('Prediction [rank]')
+        plt.xlim(lims)
+        plt.ylim(lims)
+        plt.show()
 
 
-    a = plt.axes(aspect='equal')
-    lims = [-1,19]
-    _ = plt.plot(lims, lims)
-    #plt.scatter(test.class_labels_numeric, test_y_hat)
-    xy = np.vstack([test.class_labels_numeric, test_y_hat])
-    z = gaussian_kde(xy)(xy)
-    plt.scatter(test.class_labels_numeric, test_y_hat, c=z, cmap=plt.cm.jet, norm=LogNorm())
-
-    #plt.colorbar()
-    plt.xlabel('True Values [rank]')
-    plt.ylabel('Predictions [rank]')
-    plt.xlim(lims)
-    plt.ylim(lims)
-    plt.show()
 
 
 
