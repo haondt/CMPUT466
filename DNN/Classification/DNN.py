@@ -7,6 +7,7 @@ from tensorflow.keras.optimizers import Adam, Adamax
 from tensorflow.keras.layers import ReLU, Dense, Flatten, Dropout
 from tensorflow.keras.models import model_from_json
 from matplotlib.colors import LogNorm
+from matplotlib.patches import Patch
 import re
 
 import random
@@ -372,7 +373,7 @@ def plot_classification_model(test, model=None, plot_type='alpha'):
         plt.show()
 
 
-def generate_lime_plot(data, probs, fvals, fnames, true_pred):
+def generate_lime_plot(data, data2, probs, fvals, fnames, true_pred):
     # Generates lime results as a pyplot
     # Spaghetti ahead :)
     top_preds = np.argsort(probs)[:-5:-1]
@@ -381,8 +382,8 @@ def generate_lime_plot(data, probs, fvals, fnames, true_pred):
     top_probs = np.append(top_probs, [1 - np.sum(top_probs)])
     y_pos = np.arange(len(top_probs))[::-1]
 
-    plt.figure(figsize=(15, 10), dpi=80)
-    ax1 = plt.subplot(221)
+    plt.figure(figsize=(15, 15), dpi=80)
+    ax1 = plt.subplot(321)
     ax1.margins(0)
     ax1.set_title('Prediction Probabilities (True value={})'.format(true_pred))
     rects = ax1.barh(
@@ -408,10 +409,16 @@ def generate_lime_plot(data, probs, fvals, fnames, true_pred):
         )
     ax1.set_ylabel("Rank")
 
-    ax2 = plt.subplot(212)
+    ax2 = plt.subplot(312)
     ax2.margins(0)
 
-    ax2.set_title('Contributing to / against rank {}'.format(top_preds[0], top_preds[0]))
+    ax2.set_title('Contribution Towards Rank {}'.format(top_preds[0]))
+    patches = [
+        Patch(facecolor='goldenrod', label='Positive Contribution'),
+        Patch(facecolor='cornflowerblue', label='Negative Contribution')
+    ]
+
+    ax2.legend(handles=patches, loc='upper left')
 
     x = np.array([i[1] for i in data])
     y_labels = [i[0] for i in data]
@@ -451,7 +458,51 @@ def generate_lime_plot(data, probs, fvals, fnames, true_pred):
     ax2.set_xlim([-max_xlim, max_xlim])
     ax2.axvline(color='black')
 
-    ax3 = plt.subplot(222)
+    ax4 = plt.subplot(313)
+    ax4.margins(0)
+
+    ax4.set_title('Contribution Towards Rank {}'.format(int(top_preds[0])+1))
+    ax4.legend(handles=patches, loc='upper left')
+
+    x = np.array([i[1] for i in data2])
+    y_labels = [i[0] for i in data2]
+    y_pos = np.arange(len(y_labels))[::-1]
+    rects = ax4.barh(
+        y_pos,
+        x,
+        align='center',
+        height=0.5,
+        color=['goldenrod' if i > 0 else 'cornflowerblue' for i in x]
+    )
+
+    for i in range(len(rects)):
+        rect = rects[i]
+        # tick_label=y_labels,
+        yloc = rect.get_y() + rect.get_height()
+        width = rect.get_width()
+        align = 'left'
+        offset = 5
+        if width < 0:
+            align = 'right'
+            offset *= -1
+        label = ax4.annotate(
+            y_labels[i],
+            xy=(0, yloc),
+            xytext=(offset, 5),
+            textcoords='offset points',
+            horizontalalignment=align,
+            verticalalignment='center',
+            color='black',
+            clip_on=True
+        )
+    ax4.set_ylim([ax4.get_ylim()[0], ax4.get_ylim()[1] + 0.5])
+    ax4.get_yaxis().set_visible(False)
+    xlim = ax4.get_xlim()
+    max_xlim = np.max(np.abs(xlim))
+    ax4.set_xlim([-max_xlim, max_xlim])
+    ax4.axvline(color='black')
+
+    ax3 = plt.subplot(322)
     extract_fname = lambda f: [i.strip() for i in re.findall(r'[A-Za-z ]+', f) if len(i.strip()) > 0][0]
     table = ax3.table(
         colLabels=['Feature', 'Value'],
@@ -462,6 +513,7 @@ def generate_lime_plot(data, probs, fvals, fnames, true_pred):
     table.scale(1, 1.5)
     ax3.axis('tight')
     ax3.axis('off')
+    ax3.set_title('Feature Values Contributing To Rank {}'.format(top_preds[0]))
 
     plt.show()
 
@@ -490,17 +542,19 @@ def explain_model(test: Data, train: Data, model=None):
         data_row=sample,
         predict_fn=model.predict,
         num_features=10,
-        top_labels=1
+        top_labels=19
     )
 
     # Plot explanation
-    pred =  model.predict_classes(np.array([sample]))[0]
+    pred = model.predict_classes(np.array([sample]))[0]
+    true = test.class_labels_numeric[sample_index]
     generate_lime_plot(
         exp.as_list(label=pred),
+        exp.as_list(label=min(18,pred+1)),
         model.predict(np.array([sample]))[0],
         sample,
         test.feature_names,
-        test.class_labels_numeric[sample_index]
+        true
     )
 
 
