@@ -204,7 +204,7 @@ def train_classification_model(train):
         x=train.feature_numeric,
         y=train.class_labels_numeric,
         batch_size=100000,
-        epochs=500,
+        epochs=200,
         verbose=1,
         class_weight=train.class_weight,
         validation_split=0.2
@@ -583,10 +583,10 @@ def main():
     #tune_classification(train)
 
     # Train model
-    #train_classification_model(train)
+    train_classification_model(train)
 
     # Test model
-    #test_classification_model(test)
+    test_classification_model(test)
 
     # Test model and plot result
     #for p in ['heat', 'avg_per_rank','box_per_rank','violin_per_rank','std_dev_per_rank']:
