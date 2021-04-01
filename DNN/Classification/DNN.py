@@ -7,6 +7,7 @@ from tensorflow.keras.optimizers import Adam, Adamax
 from tensorflow.keras.layers import ReLU, Dense, Flatten, Dropout
 from tensorflow.keras.models import model_from_json
 from matplotlib.colors import LogNorm
+import re
 
 import random
 from multiprocessing.dummy import Pool as ThreadPool
@@ -371,34 +372,136 @@ def plot_classification_model(test, model=None, plot_type='alpha'):
         plt.show()
 
 
+def generate_lime_plot(data, probs, fvals, fnames, true_pred):
+    # Generates lime results as a pyplot
+    # Spaghetti ahead :)
+    top_preds = np.argsort(probs)[:-5:-1]
+    top_probs = probs[top_preds]
+    top_preds = [str(i) for i in top_preds] + ['Other']
+    top_probs = np.append(top_probs, [1 - np.sum(top_probs)])
+    y_pos = np.arange(len(top_probs))[::-1]
+
+    plt.figure(figsize=(15, 10), dpi=80)
+    ax1 = plt.subplot(221)
+    ax1.margins(0)
+    ax1.set_title('Prediction Probabilities (True value={})'.format(true_pred))
+    rects = ax1.barh(
+        y_pos,
+        top_probs,
+        align='center',
+        tick_label=top_preds,
+        color=['goldenrod'] + ['cornflowerblue'] * (len(top_preds) - 1)
+    )
+
+    for rect in rects:
+        yloc = rect.get_y() + rect.get_height() / 2
+        width = rect.get_width()
+        label = ax1.annotate(
+            str(round(width, 2)),
+            xy=(width, yloc),
+            xytext=(-5, 0),
+            textcoords='offset points',
+            horizontalalignment='right',
+            verticalalignment='center',
+            color='black',
+            clip_on=True
+        )
+    ax1.set_ylabel("Rank")
+
+    ax2 = plt.subplot(212)
+    ax2.margins(0)
+
+    ax2.set_title('Contributing to / against rank {}'.format(top_preds[0], top_preds[0]))
+
+    x = np.array([i[1] for i in data])
+    y_labels = [i[0] for i in data]
+    y_pos = np.arange(len(y_labels))[::-1]
+    rects = ax2.barh(
+        y_pos,
+        x,
+        align='center',
+        height=0.5,
+        color=['goldenrod' if i > 0 else 'cornflowerblue' for i in x]
+    )
+
+    for i in range(len(rects)):
+        rect = rects[i]
+        # tick_label=y_labels,
+        yloc = rect.get_y() + rect.get_height()
+        width = rect.get_width()
+        align = 'left'
+        offset = 5
+        if width < 0:
+            align = 'right'
+            offset *= -1
+        label = ax2.annotate(
+            y_labels[i],
+            xy=(0, yloc),
+            xytext=(offset, 5),
+            textcoords='offset points',
+            horizontalalignment=align,
+            verticalalignment='center',
+            color='black',
+            clip_on=True
+        )
+    ax2.set_ylim([ax2.get_ylim()[0], ax2.get_ylim()[1] + 0.5])
+    ax2.get_yaxis().set_visible(False)
+    xlim = ax2.get_xlim()
+    max_xlim = np.max(np.abs(xlim))
+    ax2.set_xlim([-max_xlim, max_xlim])
+    ax2.axvline(color='black')
+
+    ax3 = plt.subplot(222)
+    extract_fname = lambda f: [i.strip() for i in re.findall(r'[A-Za-z ]+', f) if len(i.strip()) > 0][0]
+    table = ax3.table(
+        colLabels=['Feature', 'Value'],
+        cellText=[[i[0], np.round(fvals[fnames.index(extract_fname(i[0]))], 2)] for i in data],
+        cellColours=[['goldenrod'] * 2 if i[1] > 0 else ['cornflowerblue'] * 2 for i in data],
+        loc='center'
+    )
+    table.scale(1, 1.5)
+    ax3.axis('tight')
+    ax3.axis('off')
+
+    plt.show()
+
 def explain_model(test: Data, train: Data, model=None):
+    # Get model
     if model is None:
         model = get_model()
 
 
-    sample = np.array([test.feature_numeric[25]])
-    print(model.predict_classes(sample))
-
+    # Create explainer
     explainer = lime_tabular.LimeTabularExplainer(
         train.feature_numeric,
         feature_names=train.feature_names,
-        class_names=train.class_labels_numeric,
-        discretize_continuous=True
+        class_names=train.classes_numeric,
+        training_labels=train.class_labels_numeric,
+        discretize_continuous=True,
+        mode='classification'
     )
+
+    # Choose sample
+    sample_index = 25
+    sample = test.feature_numeric[sample_index]
+
+    # Create explanation
     exp = explainer.explain_instance(
-        test.feature_numeric[25],
-        model.predict_proba,
-        num_features=first_layer_size,
-        top_labels=19
+        data_row=sample,
+        predict_fn=model.predict,
+        num_features=10,
+        top_labels=1
     )
 
-    print(test.class_labels_numeric[25])
-
-
-
-    exp.save_to_file('lime.html',show_table=True, show_all=False)
-
-
+    # Plot explanation
+    pred =  model.predict_classes(np.array([sample]))[0]
+    generate_lime_plot(
+        exp.as_list(label=pred),
+        model.predict(np.array([sample]))[0],
+        sample,
+        test.feature_names,
+        test.class_labels_numeric[sample_index]
+    )
 
 
 def main():
@@ -435,7 +538,8 @@ def main():
     #for p in ['heat', 'avg_per_rank','box_per_rank','violin_per_rank','std_dev_per_rank']:
         #plot_classification_model(test, plot_type=p)
 
-    explain_model(test,train)
+    # Choose a sample from test set and try to explain the prediction
+    #explain_model(test,train)
 
 
 
