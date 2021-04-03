@@ -204,7 +204,7 @@ def train_classification_model(train):
         x=train.feature_numeric,
         y=train.class_labels_numeric,
         batch_size=100000,
-        epochs=200,
+        epochs=100,
         verbose=1,
         class_weight=train.class_weight,
         validation_split=0.2
@@ -517,6 +517,43 @@ def generate_lime_plot(data, data2, probs, fvals, fnames, true_pred):
 
     plt.show()
 
+
+def generate_feature_overview_plot(exp, probs, fvals, fnames, true_pred):
+    top_preds = np.argsort(probs)[:-5:-1]
+    top_probs = probs[top_preds]
+    top_preds = [str(i) for i in top_preds] + ['Other']
+    top_probs = np.append(top_probs, [1 - np.sum(top_probs)])
+
+    print("\ntop_preds\n", top_preds)
+    print("\ntop_probs\n", top_probs)
+    print("\nexp\n", exp)
+    print("\nprobs\n", probs)
+    print("\nfvals\n", fvals)
+    print("\nfnames\n", fnames)
+    print("\ntrue_pred\n", true_pred)
+
+    cm = []
+    for i in range(19):
+        features = sorted(exp.as_list(label=i))
+        cm.append(features)
+
+    cm = np.array(cm)
+
+    fig, ax = plt.subplots()
+
+    for i in range(19):
+        feature = cm[:,i:i+1]
+        print(feature)
+        plt.plot([i+1 for i in range(19)], feature[:,0][:,1].astype(np.float), label=feature[:,0][:,0][0])
+
+    plt.xlabel("Rank")
+    plt.ylabel("Contribution")
+    plt.title("Feature Contributions by Rank Overview")
+    plt.legend()
+
+    plt.show()
+
+
 def explain_model(test: Data, train: Data, model=None):
     # Get model
     if model is None:
@@ -537,25 +574,35 @@ def explain_model(test: Data, train: Data, model=None):
     sample_index = 25
     sample = test.feature_numeric[sample_index]
 
+    print()
     # Create explanation
     exp = explainer.explain_instance(
         data_row=sample,
         predict_fn=model.predict,
-        num_features=10,
+        num_features=len(test.feature_names),
         top_labels=19
     )
 
     # Plot explanation
     pred = model.predict_classes(np.array([sample]))[0]
     true = test.class_labels_numeric[sample_index]
-    generate_lime_plot(
-        exp.as_list(label=pred),
-        exp.as_list(label=min(18,pred+1)),
+    
+    #generate_lime_plot(
+    #    exp.as_list(label=pred),
+    #    exp.as_list(label=min(18,pred+1)),
+    #    model.predict(np.array([sample]))[0],
+    #    sample,
+    #    test.feature_names,
+    #    true
+    #)
+
+    generate_feature_overview_plot(
+        exp,
         model.predict(np.array([sample]))[0],
         sample,
         test.feature_names,
         true
-    )
+    ) 
 
 
 def main():
@@ -593,7 +640,7 @@ def main():
         #plot_classification_model(test, plot_type=p)
 
     # Choose a sample from test set and try to explain the prediction
-    #explain_model(test,train)
+    explain_model(test,train)
 
 
 
