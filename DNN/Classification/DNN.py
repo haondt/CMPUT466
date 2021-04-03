@@ -204,7 +204,7 @@ def train_classification_model(train):
         x=train.feature_numeric,
         y=train.class_labels_numeric,
         batch_size=100000,
-        epochs=100,
+        epochs=200,
         verbose=1,
         class_weight=train.class_weight,
         validation_split=0.2
@@ -518,20 +518,12 @@ def generate_lime_plot(data, data2, probs, fvals, fnames, true_pred):
     plt.show()
 
 
-def generate_feature_overview_plot(exp, probs, fvals, fnames, true_pred):
-    top_preds = np.argsort(probs)[:-5:-1]
-    top_probs = probs[top_preds]
-    top_preds = [str(i) for i in top_preds] + ['Other']
-    top_probs = np.append(top_probs, [1 - np.sum(top_probs)])
-
-    print("\ntop_preds\n", top_preds)
-    print("\ntop_probs\n", top_probs)
-    print("\nexp\n", exp)
-    print("\nprobs\n", probs)
-    print("\nfvals\n", fvals)
-    print("\nfnames\n", fnames)
-    print("\ntrue_pred\n", true_pred)
-
+def generate_feature_overview_plot(exp):
+    """
+    Generates a plot of feature contribution by rank for the given instance
+    Displays the 10 most significant features as measured by their total change
+    """
+    # Contributions Matirx
     cm = []
     for i in range(19):
         features = sorted(exp.as_list(label=i))
@@ -539,16 +531,26 @@ def generate_feature_overview_plot(exp, probs, fvals, fnames, true_pred):
 
     cm = np.array(cm)
 
+    # Prep Lines
+    lines = []
+    for i in range(19):
+        feature = cm[:,i:i+1][:,0]
+        # Pair together in format: (label, y_values)
+        lines.append((feature[:,0][0], feature[:,1].astype(np.float)))
+
+    lines = sorted(lines, key=lambda x: abs(x[1][0]-x[1][-1]), reverse=True)[:10]
+
+    # Plot Feature Contributions
     fig, ax = plt.subplots()
 
-    for i in range(19):
-        feature = cm[:,i:i+1]
-        print(feature)
-        plt.plot([i+1 for i in range(19)], feature[:,0][:,1].astype(np.float), label=feature[:,0][:,0][0])
+    for l in lines:
+        ax.plot([i+1 for i in range(19)], l[1], label=l[0])
 
+    ax.set_xticks([i+1 for i in range(19)])
+        
     plt.xlabel("Rank")
     plt.ylabel("Contribution")
-    plt.title("Feature Contributions by Rank Overview")
+    plt.title("Feature Contributions by Rank")
     plt.legend()
 
     plt.show()
@@ -574,12 +576,11 @@ def explain_model(test: Data, train: Data, model=None):
     sample_index = 25
     sample = test.feature_numeric[sample_index]
 
-    print()
     # Create explanation
     exp = explainer.explain_instance(
         data_row=sample,
         predict_fn=model.predict,
-        num_features=len(test.feature_names),
+        num_features=10,
         top_labels=19
     )
 
@@ -587,22 +588,25 @@ def explain_model(test: Data, train: Data, model=None):
     pred = model.predict_classes(np.array([sample]))[0]
     true = test.class_labels_numeric[sample_index]
     
-    #generate_lime_plot(
-    #    exp.as_list(label=pred),
-    #    exp.as_list(label=min(18,pred+1)),
-    #    model.predict(np.array([sample]))[0],
-    #    sample,
-    #    test.feature_names,
-    #    true
-    #)
-
-    generate_feature_overview_plot(
-        exp,
+    generate_lime_plot(
+        exp.as_list(label=pred),
+        exp.as_list(label=min(18,pred+1)),
         model.predict(np.array([sample]))[0],
         sample,
         test.feature_names,
         true
-    ) 
+    )
+
+    # Create explanation with all features
+    exp = explainer.explain_instance(
+        data_row=sample,
+        predict_fn=model.predict,
+        num_features=len(test.feature_names),
+        top_labels=19
+    )
+
+    # Plot Contribution Overview
+    generate_feature_overview_plot(exp) 
 
 
 def main():
