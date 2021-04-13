@@ -6,5 +6,6 @@ DNN/**/*.h5
 DNN/**/*.png
 DNN/**/*.html
 DNN/**/figures/
+DT/**/*.png
 *.csv
 *.data
