@@ -38,18 +38,6 @@ class CVTuner(Tuner):
 
 
 
-def create_classification_model():
-    model = Sequential()
-    model.add(Dense(90, activation="relu", input_shape=(65,)))
-    model.add(Dropout(0.25))
-    model.add(Dense(90, activation="sigmoid"))
-    model.add(Dropout(0.25))
-    model.add(Dense(60, activation="relu"))
-    model.add(Dropout(0.25))
-    model.add(Dense(70, activation="softmax"))
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
-
 
 
 def create_regression_model():
@@ -89,6 +77,7 @@ def create_regression_model_mmr():
         optimizer='adamax',
         loss=r2, metrics=['accuracy'])
     return model
+
 def r2(y_true, y_pred):
     SS_res =  K.sum(K.square( y_true-y_pred ))
     SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
@@ -241,102 +230,6 @@ def regression_model_builder_3(hp):
     return model
 
 
-def classification_model_builder(hp):
-    model = Sequential()
-    model.add(Dense(hp.Int('units_first_layer',40,80,step=10), input_shape=(65,),
-        activation=hp.Choice('activation_first_layer', values=['relu','sigmoid','tanh'])))
-
-    for i in range(hp.Int('additional_layers', 3, 5)):
-        model.add(Dense(
-            units=hp.Int('units_' + str(i), 20, 80, step=10),
-            activation=hp.Choice('activation_' + str(i), values=['relu', 'sigmoid', 'tanh'])
-        ))
-        model.add(Dropout(hp.Float('dropout_' + str(i), min_value=0.01, max_value=0.99, default=0.4)))
-
-    model.add(Dense(hp.Int('final_layer_units', 30,100,step=10), activation="softmax"))
-
-    model.compile(
-        optimizer=Adam(
-            learning_rate=hp.Float('learning_rate', min_value=1e-5, max_value=1e-1, sampling='LOG', default=1e-3),
-            beta_1=hp.Float('beta_1', min_value=0.9, max_value=0.99999, sampling='LOG', default=0.9),
-            beta_2=hp.Float('beta_2', min_value=0.9, max_value=0.99999, sampling='LOG', default=0.999)
-        ),
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    return model
-def classification_model_builder_X(hp):
-    model = Sequential()
-    model.add(Dense(hp.Int('units_first_layer',40,80,step=10), input_shape=(65,),
-        activation=hp.Choice('activation_first_layer', values=['relu','sigmoid','tanh'])))
-
-    for i in range(hp.Int('additional_layers', 3, 5)):
-        model.add(Dense(
-            units=hp.Int('units_' + str(i), 20, 80, step=10),
-            activation=hp.Choice('activation_' + str(i), values=['relu', 'sigmoid', 'tanh'])
-        ))
-        model.add(Dropout(hp.Float('dropout_' + str(i), min_value=0.01, max_value=0.99, default=0.4)))
-
-    model.add(Dense(hp.Int('final_layer_units', 30,100,step=10), activation="softmax"))
-
-    model.compile(
-        optimizer=Adam(
-            learning_rate=hp.Float('learning_rate', min_value=1e-5, max_value=1e-1, sampling='LOG', default=1e-3),
-            beta_1=hp.Float('beta_1', min_value=0.9, max_value=0.99999, sampling='LOG', default=0.9),
-            beta_2=hp.Float('beta_2', min_value=0.9, max_value=0.99999, sampling='LOG', default=0.999)
-        ),
-        loss='mean_squared_error',
-        metrics=['accuracy']
-    )
-    return model
-
-def classification_model_builder_2(hp):
-    '''
-    Result:
-    {
-        'units_first_layer': 90,
-        'activation_first_layer': 'relu',
-        'additional_layers': 3,
-        'units_0': 90,
-        'activation_0': 'sigmoid',
-        'units_1': 60,
-        'activation_1': 'relu',
-        'optimizer': 'adam',
-        'units_2': 70,
-        'activation_2': 'sigmoid',
-    '''
-    model = Sequential()
-    model.add(Dense(hp.Int('units_first_layer',30,100,step=10), input_shape=(65,),
-        activation=hp.Choice('activation_first_layer', values=['relu','sigmoid','tanh'])))
-
-    for i in range(hp.Int('additional_layers', 2, 8)):
-        model.add(Dense(
-            units=hp.Int('units_' + str(i), 10,100, step=10),
-            activation=hp.Choice('activation_' + str(i), values=['relu', 'sigmoid','tanh'])
-        ))
-
-    model.compile(
-        optimizer=hp.Choice('optimizer', values=['adam','sgd','adagrad', 'adamax']),
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    return model
-
-
-def tune_classification(data):
-    tuner = kt.Hyperband(
-        classification_model_builder_X,
-        objective='val_accuracy',
-        max_epochs=100,
-        factor=3,
-        directory='.',
-        project_name='kt_project_class_x',
-        seed=0
-    )
-    stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
-    tuner.search(data.feature_numeric, data.class_labels_classification, validation_split=0.2, callbacks=[stop_early], class_weight=data.class_weight)
-    best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
-    print(best_hps.values)
 
 
 def tune_regression(data):
@@ -407,54 +300,6 @@ def _test_regression_model(data):
     _ = plt.plot(lims, lims)
     plt.show()
 
-def test_classification_model(data):
-    sample = random.sample(range(len(data.class_labels)), len(data.class_labels)//10)
-    mask = np.ones(len(data.class_labels), np.bool)
-    mask[sample] = 0
-
-    kfold = StratifiedKFold(n_splits=5, shuffle=True)
-    acc = []
-    loss = []
-    for train, test in kfold.split(data.feature_numeric, data.class_labels_classification):
-        model = create_classification_model()
-        model.fit(
-            x=data.feature_numeric[train,:],
-            y=data.class_labels_classification[train],
-            batch_size=50000,
-            epochs=2000,
-            verbose=1,
-            class_weight=data.class_weight
-        )
-        scores = model.evaluate(data.feature_numeric[test], data.class_labels_classification[test], verbose=0)
-        acc.append(scores[1]*100)
-        loss.append(scores[0])
-
-    print("accs:", acc)
-    print("losses:", loss)
-    print("avg acc", np.mean(acc))
-    print("avg loss", np.mean(loss))
-
-
-
-    '''
-    test_y_hat = model.predict_classes(test_x)
-    print(test_y)
-    print(test_y_hat)
-
-    loss, acc = model.evaluate(test_x, test_y, verbose=0)
-    print('loss: {}, accuracy: {}'.format(loss, acc))
-
-
-    a = plt.axes(aspect='equal')
-    plt.scatter(test_y, test_y_hat)
-    plt.xlabel('True Values [rank]')
-    plt.ylabel('Predictions [rank]')
-    lims = [-1,20]
-    plt.xlim(lims)
-    plt.ylim(lims)
-    _ = plt.plot(lims, lims)
-    plt.show()
-    '''
 def test_regression_model(data):
 
     kfold = KFold(n_splits=5, shuffle=True)
