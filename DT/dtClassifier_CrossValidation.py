@@ -47,11 +47,11 @@ def gridSearch(X, y, dTree):
     print('gridSearch')
 
     # pick paramters to iterate over
-    splitter		= ['best']
-    max_depth		= [9, 15, None]
-    min_samples_split	= [10,15]
-    min_samples_leaf	= [5,10,15]
-    max_features		= [40, 50, 60]
+    splitter		    = ['best']
+    max_depth		    = [9, 10, 15, 20, 25]
+    min_samples_split	= [500, 1000, 1500, 2000, 2500]
+    min_samples_leaf	= [200, 500, 1000, 1500, 2000, 2500]
+    max_features		= [40, 50, None]
 	
     param_grid = {'splitter':splitter, 'max_depth': max_depth,
 		          'min_samples_split': min_samples_split, 'min_samples_leaf': min_samples_leaf,
