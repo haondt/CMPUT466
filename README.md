@@ -54,6 +54,23 @@ include the DNN regression in the report. The code is just here for completness.
 
 ## DT
 
+The main file for decision tress is `dtClassifier_CrossValidation.py`. This file 
+starts of by reading in the data, shuffling it, then splitting it into test and train set
+It then creates a decision tree object for grid search to use.
+
+Within the `gridSeach` function, you can specifiy which hyperparameters to iterate over 
+and what values they should take. It then iterates over then with 10 fold cross validation.
+It reports the best parameters it found along with the best accuracy and returns a decision 
+tree that utilizes those parameters.
+
+The code then takes this decision tree and runs it against the test data that had been set 
+aside earlier and reports the accuracy as well as creates a figure for the confusion matrix 
+and decision tree.
+
+The second file is `stats.py` which performs permutation testing. It shuffles the y labels 
+of the data and runs the model against it recording it's accuracy. It then finds the percentage 
+that did better than the true accuracy and reports that value.
+
 ## MLR
 
 ## Scraping
